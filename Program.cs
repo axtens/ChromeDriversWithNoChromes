@@ -6,28 +6,30 @@ using System.Management;
 
 namespace ChromeDriversWithNoChromes
 {
+    internal class CommandLine
+    {
+        public Dictionary<string, object> Slashed { get; set; }
+        public List<string> Args { get; set; }
+    }
+
     class Program
     {
-        static readonly Dictionary<string, object> Settings = new Dictionary<string, object>();
-        static readonly List<string> Args = new List<string>();
-
-        static readonly List<Process> FoundProcesses = new List<Process>();
         static void Main(string[] args)
         {
-            ParseCommandLineToSettingsAndArgs(args);
-            var count = StoreProcesses(new string[] { "chromedriver" });
-            if (count > 0)
+            var CommandLineResults = ParseCommandLineToSettingsAndArgs(args);
+            var processList = FindProcesses(new string[] { "chromedriver" });
+            if (processList.Count > 0)
             {
-                Console.WriteLine($"{count} chromedrivers found.");
+                Console.WriteLine($"{processList.Count} chromedrivers found.");
 
-                foreach (var proc in FoundProcesses)
+                foreach (var proc in processList)
                 {
                     var descendants = GetChildren(proc);
                     string tag = string.Empty;
 
                     if (descendants.Count() == 0)
                     {
-                        if (Settings.ContainsKey("/K"))
+                        if (CommandLineResults.Slashed.ContainsKey("/K"))
                         {
                             try
                             {
@@ -55,8 +57,14 @@ namespace ChromeDriversWithNoChromes
             }
         }
 
-        static void ParseCommandLineToSettingsAndArgs(string[] args)
+        static CommandLine ParseCommandLineToSettingsAndArgs(string[] args)
         {
+            var results = new CommandLine
+            {
+                Slashed = new Dictionary<string, object>(),
+                Args = new List<string>()
+            };
+
             foreach (string arg in args)
             {
                 if (arg.StartsWith("/"))
@@ -64,33 +72,33 @@ namespace ChromeDriversWithNoChromes
                     var colonPos = arg.IndexOf(":");
                     if (colonPos > -1)
                     {
-                        Settings[arg.Substring(0, colonPos)] = arg.Substring(colonPos + 1);
+                        results.Slashed[arg.Substring(0, colonPos)] = arg.Substring(colonPos + 1);
                     }
                     else
                     {
-                        Settings[arg] = true;
+                        results.Slashed[arg] = true;
                     }
                 }
                 else
                 {
-                    Args.Add(arg);
+                    results.Args.Add(arg);
                 }
             }
+            return results;
         }
 
-        static int StoreProcesses(string[] processNames)
+        static List<Process> FindProcesses(string[] processNames)
         {
-            int count = 0;
+            var results = new List<Process>();
             foreach (string name in processNames)
             {
                 var processes = Process.GetProcessesByName(name);
                 if (processes.Count() > 0)
                 {
-                    FoundProcesses.AddRange(processes);
-                    count += processes.Count();
+                    results.AddRange(processes);
                 }
             }
-            return count;
+            return results;
         }
 
         static Process[] GetChildren(Process process)
